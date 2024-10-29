@@ -7,7 +7,7 @@ from typing import List, Dict, Set
 class Bot2vec:
     def __init__(self, G: nx.Graph, walk_length: int, num_walks: int, p: float, q: float, r: float):
         """
-        Initialize Bot2vec algorithm
+        Initialize Bot2vec algorithm_1
 
         Args:
             G: Input graph

@@ -1,6 +1,6 @@
 import networkx as nx
 import numpy as np
-from main import Bot2vec
+from algorithm_1.main import Bot2vec
 
 import matplotlib
 
