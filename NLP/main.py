@@ -4,10 +4,9 @@ import re
 import string
 
 
-# Định nghĩa class TextSummarizer
 class TextSummarizer:
     def __init__(self):
-        """Khởi tạo các biến cần thiết"""
+        """Khởi tạo các biến """
         self.input_text = ""
         self.sentences = []
         self.word_freq = Counter()
@@ -126,7 +125,6 @@ class TextSummarizer:
         }
 
 
-# Phần chạy chương trình (đặt bên ngoài class)
 if __name__ == "__main__":
     # Văn bản mẫu
     text = """
