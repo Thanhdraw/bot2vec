@@ -2,9 +2,26 @@ import re
 from collections import Counter
 import string
 import os
+from datetime import datetime
+from bs4 import BeautifulSoup
 import matplotlib.pyplot as plt
 import networkx as nx
+import html  # Thư viện cần thiết cho việc escape HTML
 
+def sentence_similarity(s1, s2):
+    """
+    Tính độ tương đồng giữa hai câu.
+
+    Args:
+        s1 (str): Câu thứ nhất.
+        s2 (str): Câu thứ hai.
+
+    Returns:
+        float: Độ tương đồng giữa hai câu.
+    """
+    words1 = set(s1.lower().split())
+    words2 = set(s2.lower().split())
+    return len(words1.intersection(words2)) / (len(words1) + len(words2))
 
 class TextSummarizer:
     def __init__(self):
@@ -15,15 +32,18 @@ class TextSummarizer:
 
     def load_text_from_file(self, file_path):
         """
-        Đọc văn bản từ file.
+        Đọc văn bản từ file, loại bỏ các thẻ <s> và tái tạo văn bản hoàn chỉnh.
 
         Args:
             file_path (str): Đường dẫn tới file chứa văn bản.
         """
         try:
             with open(file_path, 'r', encoding='utf-8') as file:
-                self.input_text = file.read()
-            self.load_text(self.input_text)
+                soup = BeautifulSoup(file, 'html.parser')
+                # Lấy tất cả văn bản, bỏ qua thẻ <s>
+                cleaned_text = ' '.join(soup.stripped_strings)
+                self.load_text(cleaned_text)
+            print(f"Đọc file thành công: {file_path}")
         except FileNotFoundError:
             print(f"Không tìm thấy file: {file_path}")
 
@@ -38,8 +58,10 @@ class TextSummarizer:
             int: Số lượng câu trong văn bản.
         """
         self.input_text = text
+        # Tách văn bản thành các câu
         self.sentences = re.split('[.!?]', self.input_text)
         self.sentences = [s.strip() for s in self.sentences if s.strip()]
+        print(f"Số câu trong văn bản: {len(self.sentences)}")
         return len(self.sentences)
 
     def preprocess_text(self):
@@ -50,21 +72,7 @@ class TextSummarizer:
         words = re.sub(r'[{}]'.format(string.punctuation), ' ', words)
         words = words.split()
         self.word_freq = Counter(words)
-
-    def sentence_similarity(self, s1, s2):
-        """
-        Tính độ tương đồng giữa hai câu.
-
-        Args:
-            s1 (str): Câu thứ nhất.
-            s2 (str): Câu thứ hai.
-
-        Returns:
-            float: Độ tương đồng giữa hai câu.
-        """
-        words1 = set(s1.lower().split())
-        words2 = set(s2.lower().split())
-        return len(words1.intersection(words2)) / (len(words1) + len(words2))
+        print(f"Số lượng từ trong văn bản: {len(self.word_freq)}")
 
     def create_sentence_graph(self):
         """
@@ -76,11 +84,12 @@ class TextSummarizer:
 
         for i in range(len(self.sentences)):
             for j in range(i + 1, len(self.sentences)):
-                weight = self.sentence_similarity(self.sentences[i], self.sentences[j])
+                weight = sentence_similarity(self.sentences[i], self.sentences[j])
                 if weight > 0:
                     G.add_edge(i, j, weight=weight)
 
         self.sentence_graph = G
+        print(f"Đồ thị câu đã được tạo. Số lượng đỉnh: {len(G.nodes)}, Số lượng cạnh: {len(G.edges)}")
 
     def rank_sentences(self):
         """
@@ -108,27 +117,34 @@ class TextSummarizer:
         self.preprocess_text()
         ranked_sentences = self.rank_sentences()
         summary = ' '.join(ranked_sentences[:int(len(ranked_sentences) * ratio)])
+        print(f"Bản tóm tắt: {summary[:200]}...")  # In ra 200 ký tự đầu tiên của tóm tắt
         return summary
 
     def evaluate(self, original, summary):
         """
         Đánh giá bản tóm tắt.
-
-        Args:
-            original (str): Văn bản gốc.
-            summary (str): Bản tóm tắt.
-
-        Returns:
-            dict: Các chỉ số đánh giá, bao gồm tỷ lệ nén, số câu trong văn bản gốc và số câu trong bản tóm tắt.
         """
-        compression_ratio = len(summary.split()) / len(original.split())
+        original_word_count = len(original.split())
+        summary_word_count = len(summary.split())
+
+        # Tránh lỗi chia cho 0
+        if original_word_count == 0:
+            print("Văn bản gốc rỗng, không thể đánh giá.")
+            return {
+                'compression_ratio': 0,
+                'original_sentences': len(self.sentences),
+                'summary_sentences': len(summary.split('.'))
+            }
+
+        compression_ratio = summary_word_count / original_word_count
         return {
             'compression_ratio': compression_ratio,
             'original_sentences': len(self.sentences),
             'summary_sentences': len(summary.split('.'))
         }
 
-    def save_to_html(self, output_file, original_text, summary_text, metrics):
+    @staticmethod
+    def save_to_html(output_file, original_text, summary_text, metrics):
         """
         Lưu văn bản gốc, bản tóm tắt và các chỉ số đánh giá vào file HTML.
 
@@ -138,6 +154,13 @@ class TextSummarizer:
             summary_text (str): Bản tóm tắt.
             metrics (dict): Các chỉ số đánh giá.
         """
+        # Escape các ký tự đặc biệt trong văn bản
+        original_text = html.escape(original_text)
+        summary_text = html.escape(summary_text)
+
+        # Lấy thời gian hiện tại
+        current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
         html_content = f"""
         <!DOCTYPE html>
         <html>
@@ -148,10 +171,14 @@ class TextSummarizer:
                 h1 {{ text-align: center; }}
                 .section {{ margin-bottom: 20px; }}
                 pre, p {{ text-decoration: none; }}
+                .timestamp {{ font-size: 0.9em; color: #555; text-align: right; margin-top: 10px; }}
             </style>
         </head>
         <body>
             <h1>Text Summarization</h1>
+            <div class="timestamp">
+                <p>Generated on: {current_time}</p>
+            </div>
             <div class="section">
                 <h2>Original Text</h2>
                 <pre style="white-space: pre-wrap;">{original_text}</pre>
@@ -170,7 +197,10 @@ class TextSummarizer:
         </html>
         """
 
+        # Tạo thư mục nếu chưa tồn tại
         os.makedirs(os.path.dirname(output_file), exist_ok=True)
+
+        # Ghi nội dung HTML vào file
         with open(output_file, 'w', encoding='utf-8') as file:
             file.write(html_content)
 
@@ -190,15 +220,53 @@ class TextSummarizer:
         plt.tight_layout()
         plt.show()
 
+    def add_sentence_numbers(self, sentences):
+        """
+        Thêm số thứ tự vào các câu.
+
+        Args:
+            sentences (list): Danh sách các câu.
+
+        Returns:
+            list: Danh sách các câu có đánh số.
+        """
+        return [f"[{i + 1}] {sentence}" for i, sentence in enumerate(sentences)]
+
+    def get_numbered_original_text(self):
+        """
+        Trả về văn bản gốc với số câu.
+        """
+        return ' '.join(self.add_sentence_numbers(self.sentences))
+
+    def get_numbered_summary_text(self, summary_sentences):
+        """
+        Trả về bản tóm tắt với số câu.
+        """
+        return ' '.join(self.add_sentence_numbers(summary_sentences))
+
 
 if __name__ == "__main__":
-    file_path = os.path.join("/Users", "dangquocthanh", "bot2vec", "NLP", "input", "d061j.html")
-    output_file = os.path.join("/Users", "dangquocthanh", "bot2vec", "NLP", "output", "summary.html")
+    # Đường dẫn file đầu vào và file xuất ra
+    file_path = r"C:\Users\PC\PycharmProjects\bot2vec\NLP\input\d061j.html"
+    output_file = r"C:\Users\PC\PycharmProjects\bot2vec\NLP\output\d061j_summary.html"
 
+    # Khởi tạo đối tượng tóm tắt văn bản
     summarizer = TextSummarizer()
     summarizer.load_text_from_file(file_path)
+
+    # Tóm tắt văn bản
     summary = summarizer.summarize(summarizer.input_text, ratio=0.4)
+
+    # Đánh số các câu trong bản gốc và bản tóm tắt
+    numbered_original_text = '\n'.join([f"[{i+1}] {sentence}" for i, sentence in enumerate(summarizer.sentences)])
+    numbered_summary_text = '\n'.join([f"[{i+1}] {sentence}" for i, sentence in enumerate(summary.split('. '))])
+
+    # Đánh giá bản tóm tắt và lưu vào biến metrics
     metrics = summarizer.evaluate(summarizer.input_text, summary)
 
-    summarizer.save_to_html(output_file, summarizer.input_text, summary, metrics)
+    # Lưu bản tóm tắt vào file HTML
+    summarizer.save_to_html(output_file, numbered_original_text, numbered_summary_text, metrics)
+
+    # Vẽ đồ thị câu
     summarizer.plot_sentence_graph()
+
