@@ -133,8 +133,20 @@ class TextSummarizer:
         if self.sentence_graph is None:
             self.create_sentence_graph()
 
-        scores = nx.pagerank(self.sentence_graph)
-        sorted_scores = sorted(scores.items(), key=lambda x: x[1], reverse=True)
+        # Ensure graph nodes are within sentence list range
+        valid_nodes = [node for node in self.sentence_graph.nodes() if node < len(self.sentences)]
+
+        # Calculate PageRank only for valid nodes
+        scores = nx.pagerank(self.sentence_graph.subgraph(valid_nodes))
+
+        # Sort sentences based on their scores
+        sorted_scores = sorted(
+            [(node, scores[node]) for node in valid_nodes],
+            key=lambda x: x[1],
+            reverse=True
+        )
+
+        # Return ranked sentences
         return [self.sentences[idx] for idx, _ in sorted_scores]
 
     # Bước 4: Tóm tắt văn bản bằng cách chọn các câu quan trọng nhất.
@@ -266,29 +278,53 @@ class TextSummarizer:
         return ' '.join(add_sentence_numbers(self.sentences))
 
 
+
+# [Rest of the previous TextSummarizer class remains the same]
+
+# [Previous TextSummarizer class remains the same]
+
 if __name__ == "__main__":
-    # Đường dẫn file đầu vào và file xuất ra
-    # file_path = r"C:\Users\PC\PycharmProjects\bot2vec\NLP\input\d061j.html"
-    # output_file = r"C:\Users\PC\PycharmProjects\bot2vec\NLP\output\d061j_summary.html"
-    file_path = os.path.join("/Users", "dangquocthanh", "bot2vec", "NLP", "input", "d061j.html")
-    output_file = os.path.join("/Users", "dangquocthanh", "bot2vec", "NLP", "output", "d061j_summary.html")
+    # Define input and output directories
+    input_dir = r"C:\Users\PC\PycharmProjects\bot2vec\NLP\input"
+    output_dir = r"C:\Users\PC\PycharmProjects\bot2vec\NLP\output"
 
-    # Khởi tạo đối tượng tóm tắt văn bản
-    summarizer = TextSummarizer()
-    summarizer.load_text_from_file(file_path)
+    # Ensure output directory exists
+    os.makedirs(output_dir, exist_ok=True)
 
-    # Tóm tắt văn bản
-    summary = summarizer.summarize(summarizer.input_text, ratio=0.4)
+    # Get all HTML files in the input directory
+    input_files = [f for f in os.listdir(input_dir) if f.endswith('.html')]
 
-    # Đánh số các câu trong bản gốc và bản tóm tắt
-    numbered_original_text = '\n'.join([f"[{i + 1}] {sentence}" for i, sentence in enumerate(summarizer.sentences)])
-    numbered_summary_text = '\n'.join([f"[{i + 1}] {sentence}" for i, sentence in enumerate(summary.split('. '))])
+    # Process each input file
+    for input_filename in input_files:
+        # Construct full file paths
+        input_file_path = os.path.join(input_dir, input_filename)
 
-    # Đánh giá bản tóm tắt và lưu vào biến metrics
-    metrics = summarizer.evaluate(summarizer.input_text, summary)
+        # Create output filename by replacing .html with _summary.html
+        output_filename = re.sub(r'\.html$', '_summary.html', input_filename)
+        output_file_path = os.path.join(output_dir, output_filename)
 
-    # Lưu bản tóm tắt vào file HTML
-    summarizer.save_to_html(output_file, numbered_original_text, numbered_summary_text, metrics)
+        # Initialization and processing
+        try:
+            # Khởi tạo đối tượng tóm tắt văn bản
+            summarizer = TextSummarizer()
+            summarizer.load_text_from_file(input_file_path)
 
-    # Vẽ đồ thị câu
-    summarizer.plot_sentence_graph()
+            # Tóm tắt văn bản
+            summary = summarizer.summarize(summarizer.input_text, ratio=0.4)
+
+            # Đánh số các câu trong bản gốc và bản tóm tắt
+            numbered_original_text = '\n'.join(
+                [f"[{i + 1}] {sentence}" for i, sentence in enumerate(summarizer.sentences)])
+            numbered_summary_text = '\n'.join(
+                [f"[{i + 1}] {sentence}" for i, sentence in enumerate(summary.split('. '))])
+
+            # Đánh giá bản tóm tắt và lưu vào biến metrics
+            metrics = summarizer.evaluate(summarizer.input_text, summary)
+
+            # Lưu bản tóm tắt vào file HTML
+            summarizer.save_to_html(output_file_path, numbered_original_text, numbered_summary_text, metrics)
+
+            print(f"Processed: {input_filename} -> {output_filename}")
+
+        except Exception as e:
+            print(f"Error processing {input_filename}: {e}")

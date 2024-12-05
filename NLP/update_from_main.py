@@ -71,7 +71,7 @@ class TextSummarizer:
         self.word_freq = Counter()
         self.sentence_graph = None
 
-    #Bước 1.1: Đọc văn bản từ file HTML, loại bỏ thẻ HTML và nạp nội dung.
+    # Bước 1.1: Đọc văn bản từ file HTML, loại bỏ thẻ HTML và nạp nội dung.
     def load_text_from_file(self, file_path):
         """
         Đọc văn bản từ file, loại bỏ các thẻ <s> và tái tạo văn bản hoàn chỉnh.
@@ -88,7 +88,7 @@ class TextSummarizer:
         except FileNotFoundError:
             print(f"Không tìm thấy file: {file_path}")
 
-    #Bước 1.2: Tách văn bản thành các câu.
+    # Bước 1.2: Tách văn bản thành các câu.
     def load_text(self, text):
         """
         Nạp văn bản và chia thành các câu.
@@ -197,7 +197,7 @@ class TextSummarizer:
         print(f"Bản tóm tắt: {summary[:200]}...")  # In ra 200 ký tự đầu tiên của tóm tắt
         return summary
 
-    #Bước 5: Đánh giá bản tóm tắt dựa trên tỷ lệ nén và số câu.
+    # Bước 5: Đánh giá bản tóm tắt dựa trên tỷ lệ nén và số câu.
 
     def evaluate(self, original, summary):
         """
@@ -287,24 +287,31 @@ class TextSummarizer:
 
         print(f"HTML output saved to: {output_file}")
 
+
+
     def plot_sentence_graph(self):
         """
-        Vẽ đồ thị câu với các nhãn câu, kiểu dáng tùy chỉnh và vị trí tối ưu.
+        Vẽ đồ thị câu với các nhãn câu và cạnh nối giữa các câu.
         """
         if self.sentence_graph is None:
             self.create_sentence_graph()
 
-        # Thiết lập vị trí các đỉnh sử dụng spring_layout (tạo layout tự động cho đồ thị)
-        pos = nx.spring_layout(self.sentence_graph, seed=42)  # seed để đảm bảo mỗi lần vẽ đều giống nhau
+        # Kiểm tra các cạnh trong đồ thị
+        print("Cạnh trong đồ thị:", list(self.sentence_graph.edges()))
+
+        # Sử dụng spring_layout để tạo vị trí các đỉnh
+        pos = nx.spring_layout(self.sentence_graph, seed=42, k=0.15)  # Thử điều chỉnh tham số k
 
         # Tạo figure
         plt.figure(figsize=(12, 8))
 
-        # Vẽ các đỉnh và cạnh
-        nx.draw_networkx_nodes(self.sentence_graph, pos, node_size=500, node_color='skyblue', alpha=0.7)
-        nx.draw_networkx_edges(self.sentence_graph, pos, width=1.0, alpha=0.6, edge_color='gray')
+        # Vẽ các đỉnh (nút)
+        nx.draw_networkx_nodes(self.sentence_graph, pos, node_size=500, node_color='lightblue')
 
-        # Vẽ các nhãn câu (các đỉnh)
+        # Vẽ các cạnh với độ dày và màu sắc đen
+        nx.draw_networkx_edges(self.sentence_graph, pos, width=2, edge_color='black', alpha=0.7)
+
+        # Vẽ các nhãn của các đỉnh (các câu)
         nx.draw_networkx_labels(self.sentence_graph, pos, font_size=10, font_family='sans-serif')
 
         # Tiêu đề cho đồ thị
@@ -323,28 +330,36 @@ class TextSummarizer:
 
 
 if __name__ == "__main__":
-    # Đường dẫn file đầu vào và file xuất ra
-    # file_path = r"C:\Users\PC\PycharmProjects\bot2vec\NLP\input\d061j.html"
-    # output_file = r"C:\Users\PC\PycharmProjects\bot2vec\NLP\output\d061j_summary.html"
-    file_path = os.path.join("/Users", "dangquocthanh", "bot2vec", "NLP", "input", "d061j.html")
-    output_file = os.path.join("/Users", "dangquocthanh", "bot2vec", "NLP", "output", "d061j_summary.html")
+    input_dir = r"C:\Users\PC\PycharmProjects\bot2vec\NLP\input"
+    output_dir = r"C:\Users\PC\PycharmProjects\bot2vec\NLP\output"
+    os.makedirs(output_dir, exist_ok=True)
 
-    # Khởi tạo đối tượng tóm tắt văn bản
-    summarizer = TextSummarizer()
-    summarizer.load_text_from_file(file_path)
+    input_files = [f for f in os.listdir(input_dir) if f.endswith('.html')]
 
-    # Tóm tắt văn bản
-    summary = summarizer.summarize(summarizer.input_text, ratio=0.4)
+    for input_filename in input_files:
+        input_file_path = os.path.join(input_dir, input_filename)
+        output_filename = re.sub(r'\.html$', '_summary.html', input_filename)
+        output_file_path = os.path.join(output_dir, output_filename)
 
-    # Đánh số các câu trong bản gốc và bản tóm tắt
-    numbered_original_text = '\n'.join([f"[{i + 1}] {sentence}" for i, sentence in enumerate(summarizer.sentences)])
-    numbered_summary_text = '\n'.join([f"[{i + 1}] {sentence}" for i, sentence in enumerate(summary.split('. '))])
+        try:
+            summarizer = TextSummarizer()
+            summarizer.load_text_from_file(input_file_path)
 
-    # Đánh giá bản tóm tắt và lưu vào biến metrics
-    metrics = summarizer.evaluate(summarizer.input_text, summary)
+            summary = summarizer.summarize(summarizer.input_text, ratio=0.4)
+            numbered_original_text = summarizer.get_numbered_original_text()
+            numbered_summary_text = get_numbered_summary_text(summary.split('. '))
 
-    # Lưu bản tóm tắt vào file HTML
-    summarizer.save_to_html(output_file, numbered_original_text, numbered_summary_text, metrics)
+            metrics = summarizer.evaluate(summarizer.input_text, summary)
+            summarizer.save_to_html(output_file_path, numbered_original_text, numbered_summary_text, metrics)
+            # Create the sentence graph
+            summarizer.create_sentence_graph()
 
-    # Vẽ đồ thị câu
-    summarizer.plot_sentence_graph()
+            # Plot the sentence graph
+            summarizer.plot_sentence_graph()
+            print(f"Processed: {input_filename} -> {output_filename}")
+
+
+        except Exception as e:
+            print(f"Error processing {input_filename}: {e}")
+            with open('error_log.txt', 'a') as log_file:
+                log_file.write(f"Error processing {input_filename}: {e}\n")
