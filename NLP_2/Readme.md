@@ -123,20 +123,6 @@ Xuất Kết Quả:
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 Dưới đây là các bước chi tiết mà chương trình thực hiện để tạo tóm tắt văn bản:
 
 1. **Tiền xử lý văn bản** (Preprocessing):
