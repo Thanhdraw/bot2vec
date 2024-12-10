@@ -9,6 +9,7 @@ Tính toán ma trận độ tương đồng giữa các câu.
 Xây dựng đồ thị từ ma trận độ tương đồng.
 Tính toán điểm PageRank cho từng câu.
 Chọn ra các câu quan trọng nhất để tóm tắt.
+
 Hy vọng giải thích này giúp bạn hiểu rõ hơn về cách tính toán và xây dựng đồ thị trong thuật toán TextRank.
 Chương trình này thực hiện các bước sau:
 
@@ -73,7 +74,7 @@ Tách Câu:
 
 Vector Hóa Văn Bản:
 ## Đã làm: Sử dụng CountVectorizer để tạo vector từ văn bản.
-## => Cải tiến: Thay thế bằng TF-IDF Vectorizer để nâng cao khả năng nhận diện tầm quan trọng của từ trong văn bản. 
+## => Cải tiến: Thay thế bằng TF-IDF Vectorizer để nâng cao khả năng nhận diện tầm quan trọng của từ trong văn bản. ✅
 
 
 
@@ -85,12 +86,12 @@ Tính Ma Trận Độ Tương Đồng Cosine:
 
 
 Xây Dựng Đồ Thị Tương Tự:
-## Đã làm: Xây dựng đồ thị từ ma trận độ tương đồng và tính điểm PageRank.
+## Đã làm: Xây dựng đồ thị từ ma trận độ tương đồng và tính điểm PageRank. ✅
 ## Cải tiến: Sử dụng mô hình đồ thị với trọng số dựa trên từ khóa, ngữ nghĩa và các yếu tố ngữ pháp.
 
 Tóm Tắt Bằng TextRank:
 
-## Đã làm: Áp dụng thuật toán TextRank để tóm tắt văn bản.
+## Đã làm: Áp dụng thuật toán TextRank để tóm tắt văn bản. ✅
 ## Cải tiến: Áp dụng các mô hình học sâu như BERT hoặc GPT để tóm tắt chính xác hơn dựa trên hiểu biết ngữ cảnh sâu sắc.
 
 Xuất Kết Quả:
