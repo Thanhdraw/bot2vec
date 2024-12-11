@@ -254,8 +254,6 @@ def write_summary_with_matrix(output_path, summary, num_sentences, similarity_ma
         file.write('tr:hover {background-color: #f1f1f1;}\n')
         file.write('</style>\n</head>\n<body>\n')
 
-        file.write("</body>\n</html>")
-        file.write("</body>\n</html>")
         file.write(f"<h1>Text Summary (generated on {now})</h1>\n")
         file.write(
             f"<h3>Number of sentences in the original text: {len(sentences)}, Number of sentences in the summary: {num_sentences}</h3>\n")
@@ -302,6 +300,8 @@ def write_summary_with_matrix(output_path, summary, num_sentences, similarity_ma
             for i, score in enumerate(pagerank_values):
                 file.write(f"<tr><td>Sentence {i + 1}</td><td>{score:.4f}</td></tr>\n")
             file.write("</table>\n")
+
+        file.write("</body>\n</html>")  # Đảm bảo kết thúc file HTML đúng cách
 
 
 def draw_and_show_graph(graph):
@@ -495,6 +495,7 @@ if __name__ == "__main__":
 
     # Write F1-score results to HTML file
     write_f1_scores_to_html(f1_results, output_folder)
+
     print("F1 Scores have been written to f1_scores.html")
 
     print("F1 Scores have been written to f1_scores.html")
