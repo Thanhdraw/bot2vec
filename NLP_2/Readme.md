@@ -102,6 +102,63 @@ Xuất Kết Quả:
 
 
 
+########################################################################################################################
+
+
+Dưới đây là mô tả các bước trong code của bạn, cùng với lý do tại sao mỗi bước là cần thiết:
+
+---
+
+### **1. Cấu hình ban đầu**
+- **Mục đích:** Chuẩn bị các công cụ và tài nguyên cần thiết.
+  - **Tải danh sách stop words:** Stop words là các từ không mang ý nghĩa quan trọng trong phân tích ngữ nghĩa (như "là", "và", "của"). Chúng cần được loại bỏ để tập trung vào các từ quan trọng hơn.
+  - **Tải mô hình spaCy:** spaCy giúp xử lý ngôn ngữ tự nhiên hiệu quả (tách câu, từ, phân tích ngữ pháp), là bước nền tảng để phân tích văn bản chính xác.
+
+---
+
+### **2. Tiền xử lý văn bản**
+- **Mục đích:** Chuẩn bị dữ liệu văn bản dưới dạng sạch và có cấu trúc.
+  - **Chuyển thành chữ thường:** Để tránh sự phân biệt giữa từ viết hoa và viết thường (ví dụ, "Hello" và "hello").
+  - **Loại bỏ ký tự đặc biệt:** Ký tự đặc biệt không đóng góp vào ý nghĩa của văn bản và có thể làm nhiễu dữ liệu.
+  - **Tách câu:** Tóm tắt dựa trên câu, vì vậy cần tách văn bản thành danh sách các câu để xử lý riêng lẻ.
+
+---
+
+### **3. Tính toán TF-IDF**
+- **Mục đích:** Đánh giá tầm quan trọng của từ trong từng câu và trong toàn bộ văn bản.
+  - **TF (Term Frequency):** Tần suất xuất hiện của từ trong một câu cho biết mức độ liên quan của từ với câu đó.
+  - **IDF (Inverse Document Frequency):** Xác định mức độ quan trọng của từ trong toàn bộ văn bản. Từ xuất hiện nhiều lần trong tất cả các câu (như stop words) sẽ có giá trị IDF thấp.
+  - **TF-IDF Vectorization:** Kết hợp TF và IDF để tạo vector đại diện cho từng câu, giúp so sánh mức độ liên quan giữa các câu.
+
+---
+
+### **4. Tính toán ma trận độ tương đồng (Cosine Similarity)**
+- **Mục đích:** Đo lường mức độ liên quan giữa các câu.
+  - **Cosine Similarity:** Tính góc giữa hai vector (TF-IDF của hai câu). Góc nhỏ hơn (tương tự lớn hơn) cho thấy hai câu có nội dung liên quan chặt chẽ.
+  - **Ma trận độ tương đồng:** Tạo đồ thị kết nối các câu dựa trên mức độ tương tự, là cơ sở để tính điểm quan trọng của câu ở bước sau.
+
+---
+
+### **5. Tính điểm quan trọng của câu (PageRank)**
+- **Mục đích:** Đánh giá tầm quan trọng của từng câu dựa trên độ liên kết với các câu khác.
+  - **PageRank:** Một thuật toán được dùng để xếp hạng các trang web, ở đây được áp dụng để xếp hạng câu. Câu nào có nhiều liên kết (độ tương đồng cao) với các câu quan trọng khác sẽ được coi là quan trọng hơn.
+  - **Kết quả:** Điểm số cho từng câu, thể hiện mức độ quan trọng của nó trong văn bản.
+
+---
+
+### **6. Tóm tắt văn bản**
+- **Mục đích:** Tạo bản tóm tắt ngắn gọn nhưng đầy đủ ý nghĩa.
+  - **Sắp xếp câu:** Câu được sắp xếp theo điểm PageRank giảm dần để chọn câu quan trọng nhất.
+  - **Lựa chọn câu:** Tỷ lệ `ratio` cho phép kiểm soát độ dài của bản tóm tắt.
+
+---
+
+### **7. Ghi kết quả và xuất ra file**
+- **Mục đích:** Trình bày kết quả một cách rõ ràng và trực quan.
+  - **Ghi bản tóm tắt:** Bản tóm tắt được lưu vào file để tiện lưu trữ hoặc chia sẻ.
+  - **Xuất ma trận độ tương đồng:** Hiển thị ma trận dưới dạng bảng HTML giúp phân tích trực quan mối quan hệ giữa các câu.
+
+---
 
 
 

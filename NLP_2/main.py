@@ -3,21 +3,21 @@ import re
 import html
 import networkx as nx
 import matplotlib.pyplot as plt
-from sklearn.metrics.pairwise import cosine_similarity
-from datetime import datetime  # Để lấy thời gian hiện tại
-import spacy
-from sklearn.feature_extraction.text import TfidfVectorizer
 import numpy as np
+from datetime import datetime
+import spacy
+from collections import Counter
+import math
 
-# Hàm tiền xử lý văn bản
+# Existing imports for stopwords
 from nltk.corpus import stopwords
 from spacy.lang.am.examples import sentences
 
 # Tải danh sách stop words tiếng Anh
 stop_words = set(stopwords.words('english'))
 
-# 1. Các hàm xử lý văn bản
 
+# Existing preprocessing function
 def preprocess_text(text):
     """
     Tiền xử lý văn bản:
@@ -29,20 +29,109 @@ def preprocess_text(text):
     text = re.sub(r'[^\w\s]', '', text)  # Loại bỏ ký tự đặc biệt
     words = text.split()  # Tách thành các từ
     words = [word for word in words if word not in stop_words]  # Loại bỏ stop words
-    return ' '.join(words)  # Kết hợp lại thành chuỗi
+    return words  # Trả về danh sách từ thay vì chuỗi
+
+
+# Custom TF-IDF calculation functions
+def calculate_term_frequency(document):
+    """
+    Tính Term Frequency (TF) cho một văn bản
+    """
+    word_counts = Counter(document)
+    total_words = len(document)
+
+    # Tính TF: số lần xuất hiện / tổng số từ
+    tf = {word: count / total_words for word, count in word_counts.items()}
+    return tf
+
+
+def calculate_idf(documents):
+    """
+    Tính Inverse Document Frequency (IDF) cho toàn bộ tập văn bản
+    """
+    # Đếm số lượng văn bản chứa từng từ
+    word_doc_count = {}
+    total_docs = len(documents)
+
+    for doc in documents:
+        unique_words = set(doc)
+        for word in unique_words:
+            word_doc_count[word] = word_doc_count.get(word, 0) + 1
+
+    # Tính IDF: log(tổng số văn bản / số văn bản chứa từ)
+    idf = {word: math.log(total_docs / count) for word, count in word_doc_count.items()}
+    return idf
+
+
+def calculate_tfidf(documents):
+    """
+    Tính TF-IDF cho toàn bộ tập văn bản
+    """
+    # Tính IDF trước
+    idf = calculate_idf(documents)
+
+    # Tính TF-IDF cho từng văn bản
+    tfidf_documents = []
+    for doc in documents:
+        # Tính TF của văn bản
+        tf = calculate_term_frequency(doc)
+
+        # Tính TF-IDF
+        tfidf = {word: tf.get(word, 0) * idf.get(word, 0) for word in set(doc)}
+        tfidf_documents.append(tfidf)
+
+    return tfidf_documents
+
+
+def create_tfidf_vectors(documents):
+    """
+    Tạo vector TF-IDF cho các văn bản
+    """
+    # Lấy toàn bộ từ vựng
+    all_words = set(word for doc in documents for word in doc)
+
+    # Tính TF-IDF
+    tfidf_docs = calculate_tfidf(documents)
+
+    # Chuyển đổi sang vector
+    vectors = []
+    for tfidf_doc in tfidf_docs:
+        vector = [tfidf_doc.get(word, 0) for word in sorted(all_words)]
+        vectors.append(vector)
+
+    return np.array(vectors), sorted(all_words)
+
+
+def cosine_similarity_custom(v1, v2):
+    """
+    Tính toán độ tương đồng cosine giữa hai vector
+    """
+    # Tính tích vô hướng
+    dot_product = np.dot(v1, v2)
+
+    # Tính độ dài vector
+    norm_v1 = np.linalg.norm(v1)
+    norm_v2 = np.linalg.norm(v2)
+
+    # Tránh chia cho 0
+    if norm_v1 * norm_v2 == 0:
+        return 0
+
+    return dot_product / (norm_v1 * norm_v2)
+
 
 # Hàm tách câu từ văn bản
 nlp = spacy.load("en_core_web_sm")  # Tải mô hình spaCy
+
 
 def split_sentences(text):
     """
     Hàm tách câu sử dụng spaCy
     """
-    doc = nlp(text)  # Phân tích văn bản
-    # sentences = re.split(r'(?<=[.!?]) +', text)  # Tách câu theo dấu câu - Thư viện Spacy
+    doc = nlp(text)  # Phân tích văn bản # Tách câu theo dấu câu - Thư viện Spacy
+    # sentences = re.split(r'(?<=[.!?]) +', text)
 
     sentences = [sent.text for sent in doc.sents]  # Lấy câu từ đối tượng doc
-
 
     return sentences
 
@@ -76,24 +165,23 @@ def pagerank(graph, max_iter=100, d=0.85, tol=1e-6):
 
     return pagerank_values
 
-# Hàm tóm tắt văn bản sử dụng TextRank
 
+# Hàm tóm tắt văn bản sử dụng TextRank
 def summarize_text_textrank_auto(text, ratio=0.2):
     """
-    Hàm tóm tắt văn bản sử dụng TextRank.
-    :param text: Văn bản đầu vào
-    :param ratio: Tỷ lệ số lượng câu trong bản tóm tắt so với văn bản gốc
-    :return: Tóm tắt, trọng số câu, ma trận độ tương đồng, đồ thị
+    Hàm tóm tắt văn bản sử dụng TextRank với TF-IDF tự tính
     """
     sentences = split_sentences(text)
     preprocessed_sentences = [preprocess_text(sentence) for sentence in sentences]
 
-    # Vector hóa câu bằng TF-IDF Vectorizer
-    vectorizer = TfidfVectorizer(stop_words='english').fit_transform(preprocessed_sentences)
-    vectors = vectorizer.toarray()
+    # Vector hóa câu bằng TF-IDF tự tính
+    vectors, _ = create_tfidf_vectors(preprocessed_sentences)
 
     # Tính ma trận độ tương đồng cosine
-    similarity_matrix = cosine_similarity(vectors)
+    similarity_matrix = np.zeros((len(sentences), len(sentences)))
+    for i in range(len(sentences)):
+        for j in range(len(sentences)):
+            similarity_matrix[i][j] = cosine_similarity_custom(vectors[i], vectors[j])
 
     # Tính trọng số câu (tổng TF-IDF của tất cả các từ trong câu)
     sentence_weights = []
@@ -118,6 +206,7 @@ def summarize_text_textrank_auto(text, ratio=0.2):
 
     return summary, sentence_weights, similarity_matrix, graph
 
+
 def read_and_process_html(file_path):
     """
     Đọc và xử lý văn bản từ file HTML.
@@ -129,9 +218,20 @@ def read_and_process_html(file_path):
     clean_text = html.unescape(clean_text)  # Giải mã các ký tự đặc biệt (như &amp;)
     return clean_text
 
-def write_summary_with_matrix(output_path, summary, num_sentences, similarity_matrix, sentences, scores):
+
+def write_summary_with_matrix(output_path, summary, num_sentences, similarity_matrix, sentences, scores,
+                              tfidf_docs=None, all_words=None):
     """
-    Ghi tóm tắt văn bản và ma trận độ tương đồng vào file HTML.
+    Ghi tóm tắt văn bản, ma trận độ tương đồng, và giá trị TF-IDF vào file HTML.
+
+    :param output_path: Đường dẫn file xuất HTML
+    :param summary: Danh sách các câu tóm tắt
+    :param num_sentences: Số lượng câu trong tóm tắt
+    :param similarity_matrix: Ma trận độ tương đồng
+    :param sentences: Danh sách các câu gốc
+    :param scores: Điểm của các câu
+    :param tfidf_docs: Danh sách các từ điển TF-IDF (tùy chọn)
+    :param all_words: Danh sách tất cả các từ (tùy chọn)
     """
     with open(output_path, 'w', encoding='utf-8') as file:
         # Thêm thông tin ngày giờ xuất file
@@ -149,7 +249,8 @@ def write_summary_with_matrix(output_path, summary, num_sentences, similarity_ma
         file.write('</style>\n</head>\n<body>\n')
 
         file.write(f"<h1>Text Summary (generated on {now})</h1>\n")
-        file.write(f"<h3>Number of sentences in the original text: {len(sentences)}, Number of sentences in the summary: {num_sentences}</h3>\n")
+        file.write(
+            f"<h3>Number of sentences in the original text: {len(sentences)}, Number of sentences in the summary: {num_sentences}</h3>\n")
 
         # Ghi phần tóm tắt
         file.write("<h2>Summary:</h2>\n")
@@ -168,8 +269,28 @@ def write_summary_with_matrix(output_path, summary, num_sentences, similarity_ma
             for value in row:
                 file.write(f"<td>{value:.4f}</td>")  # Định dạng giá trị độ tương đồng
             file.write("</tr>\n")
+        file.write("</table>\n")
 
-        file.write("</table>\n</body>\n</html>")
+        # Ghi TF-IDF nếu được cung cấp
+        if tfidf_docs is not None and all_words is not None:
+            file.write("<h2>TF-IDF Values:</h2>\n<table>\n<tr><th>Sentence</th>\n")
+
+            # Tiêu đề cột là các từ
+            for word in all_words:
+                file.write(f"<th>{word}</th>")
+            file.write("</tr>\n")
+
+            # Ghi giá trị TF-IDF cho từng câu
+            for i, tfidf_doc in enumerate(tfidf_docs):
+                file.write(f"<tr><th>Sentence {i + 1}</th>")
+                for word in all_words:
+                    value = tfidf_doc.get(word, 0)
+                    file.write(f"<td>{value:.4f}</td>")
+                file.write("</tr>\n")
+            file.write("</table>\n")
+
+        file.write("</body>\n</html>")
+
 
 def draw_and_show_graph(graph):
     """
@@ -180,6 +301,7 @@ def draw_and_show_graph(graph):
     nx.draw(graph, pos, with_labels=True, node_size=3000, node_color='skyblue', font_size=12, font_weight='bold')
     plt.title("Đồ thị độ tương đồng giữa các câu")
     plt.show()  # Hiển thị đồ thị trong cửa sổ đồ họa
+
 
 def write_summary(output_path, summary, num_sentences):
     """
@@ -201,7 +323,8 @@ def write_summary(output_path, summary, num_sentences):
         file.write('</style>\n</head>\n<body>\n')
 
         file.write(f"<h1>Text Summary (generated on {now})</h1>\n")
-        file.write(f"<h3>Number of sentences in the original text: {len(sentences)}, Number of sentences in the summary: {num_sentences}</h3>\n")
+        file.write(
+            f"<h3>Number of sentences in the original text: {len(sentences)}, Number of sentences in the summary: {num_sentences}</h3>\n")
 
         # Ghi phần tóm tắt
         file.write("<h2>Summary:</h2>\n")
@@ -209,15 +332,27 @@ def write_summary(output_path, summary, num_sentences):
             file.write(f"<p>{sentence} </p>")  # Ghi câu vào file HTML
 
         file.write("</body>\n</html>")
+
+
 # 4. Hàm chính
 def main(input_file, output_file, ratio=0.2):
     text = read_and_process_html(input_file)
+    sentences = split_sentences(text)
+    preprocessed_sentences = [preprocess_text(sentence) for sentence in sentences]
+
+    # Tạo vector TF-IDF
+    vectors, all_words = create_tfidf_vectors(preprocessed_sentences)
+    tfidf_docs = calculate_tfidf(preprocessed_sentences)
+
     summary, scores, similarity_matrix, graph = summarize_text_textrank_auto(text, ratio=ratio)
 
     draw_and_show_graph(graph)
 
-    write_summary_with_matrix(output_file, summary, len(summary), similarity_matrix, split_sentences(text), scores)
-    print(f"Bản tóm tắt và ma trận độ tương đồng đã được ghi vào file: {output_file}")
+    # Truyền thêm tham số TF-IDF
+    write_summary_with_matrix(output_file, summary, len(summary), similarity_matrix, sentences, scores, tfidf_docs,
+                              all_words)
+    print(f"Bản tóm tắt, ma trận độ tương đồng và TF-IDF đã được ghi vào file: {output_file}")
+
 
 # 5. Hàm xử lý tất cả các file trong thư mục
 def process_all_files(input_folder, output_folder, ratio=0.2):
@@ -226,6 +361,7 @@ def process_all_files(input_folder, output_folder, ratio=0.2):
             input_path = os.path.join(input_folder, file_name)
             output_path = os.path.join(output_folder, file_name.replace(".html", "_summary.html"))
             main(input_path, output_path, ratio)
+
 
 # Chạy chương trình
 if __name__ == "__main__":
