@@ -11,7 +11,10 @@ import math
 
 # Existing imports for stopwords
 from nltk.corpus import stopwords
+from nltk.translate.bleu_score import sentence_bleu
+from sklearn.metrics import f1_score, precision_score, recall_score
 from spacy.lang.am.examples import sentences
+from statsmodels.graphics.tukeyplot import results
 
 # Tải danh sách stop words tiếng Anh
 stop_words = set(stopwords.words('english'))
@@ -233,6 +236,9 @@ def write_summary_with_matrix(output_path, summary, num_sentences, similarity_ma
     :param tfidf_docs: Danh sách các từ điển TF-IDF (tùy chọn)
     :param all_words: Danh sách tất cả các từ (tùy chọn)
     """
+    # xuất điểm pagerank
+    pagerank_values = pagerank(similarity_matrix)
+
     with open(output_path, 'w', encoding='utf-8') as file:
         # Thêm thông tin ngày giờ xuất file
         now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -248,6 +254,8 @@ def write_summary_with_matrix(output_path, summary, num_sentences, similarity_ma
         file.write('tr:hover {background-color: #f1f1f1;}\n')
         file.write('</style>\n</head>\n<body>\n')
 
+        file.write("</body>\n</html>")
+        file.write("</body>\n</html>")
         file.write(f"<h1>Text Summary (generated on {now})</h1>\n")
         file.write(
             f"<h3>Number of sentences in the original text: {len(sentences)}, Number of sentences in the summary: {num_sentences}</h3>\n")
@@ -289,7 +297,11 @@ def write_summary_with_matrix(output_path, summary, num_sentences, similarity_ma
                 file.write("</tr>\n")
             file.write("</table>\n")
 
-        file.write("</body>\n</html>")
+            # Ghi điểm PageRank
+            file.write("<h2>PageRank Scores:</h2>\n<table>\n<tr><th>Sentence</th><th>PageRank</th></tr>\n")
+            for i, score in enumerate(pagerank_values):
+                file.write(f"<tr><td>Sentence {i + 1}</td><td>{score:.4f}</td></tr>\n")
+            file.write("</table>\n")
 
 
 def draw_and_show_graph(graph):
@@ -334,20 +346,122 @@ def write_summary(output_path, summary, num_sentences):
         file.write("</body>\n</html>")
 
 
+from sklearn.metrics import f1_score, precision_score, recall_score
+
+
+def calculate_f1_score(ground_truth_summary, generated_summary):
+    """
+    Tính F1-score giữa bản tóm tắt gốc và bản tóm tắt được tạo ra
+    """
+    # Tiền xử lý để so sánh
+    ground_truth_processed = [preprocess_text(' '.join(ground_truth_summary))]
+    generated_processed = [preprocess_text(' '.join(generated_summary))]
+
+    print(f"Ground Truth Processed: {ground_truth_processed}")
+    print(f"Generated Processed: {generated_processed}")
+
+    # Chuyển đổi thành vector nhị phân
+    all_words = list(set(ground_truth_processed[0] + generated_processed[0]))
+
+    print(f"All Words: {all_words}")
+
+    # Tạo vector nhị phân
+    ground_truth_vector = [1 if word in ground_truth_processed[0] else 0 for word in all_words]
+    generated_vector = [1 if word in generated_processed[0] else 0 for word in all_words]
+
+    print(f"Ground Truth Vector: {ground_truth_vector}")
+    print(f"Generated Vector: {generated_vector}")
+
+    # Tính F1-score với zero_division để tránh cảnh báo
+    f1 = f1_score(ground_truth_vector, generated_vector, zero_division=0)
+    precision = precision_score(ground_truth_vector, generated_vector, zero_division=0)
+    recall = recall_score(ground_truth_vector, generated_vector, zero_division=0)
+
+    # Tính BLEU score
+    reference = [ground_truth_processed[0]]
+    candidate = generated_processed[0]
+    bleu_score = sentence_bleu(reference, candidate)
+
+    print(f"F1: {f1}, Precision: {precision}, Recall: {recall}, BLEU: {bleu_score}")
+
+    return {
+        'f1_score': f1,
+        'precision': precision,
+        'recall': recall,
+        'bleu_score': bleu_score
+    }
+
+
+def process_all_files_with_f1_score(input_folder, output_folder, ground_truth_folder, ratio=0.2):
+    """
+    Xử lý tất cả các file và tính F1-score
+    """
+    f1_results = {}
+
+    for file_name in os.listdir(input_folder):
+        if file_name.endswith(".html"):
+            # Xử lý file đầu vào (generated summary file)
+            input_path = os.path.join(input_folder, file_name)
+            output_path = os.path.join(output_folder, file_name.replace(".html", "_summary.html"))
+
+            # Thực hiện tóm tắt
+            text = read_and_process_html(input_path)
+            summary, scores, similarity_matrix, graph = summarize_text_textrank_auto(text, ratio=ratio)
+
+            # Ghi file tóm tắt
+            write_summary(output_path, summary, len(summary))
+
+            # Tìm file tóm tắt gốc tương ứng (ground truth file)
+            ground_truth_filename = file_name.replace("_summary.html", ".html")
+            ground_truth_path = os.path.join(ground_truth_folder, ground_truth_filename)
+
+            if os.path.exists(ground_truth_path):
+                # Đọc tóm tắt gốc
+                ground_truth_text = read_and_process_html(ground_truth_path)
+                ground_truth_sentences = split_sentences(ground_truth_text)
+
+                # Tính F1-score
+                f1_metrics = calculate_f1_score(ground_truth_sentences, summary)
+                f1_results[file_name] = f1_metrics
+
+            else:
+                print(f"Ground truth file for {file_name} not found!")
+
+    return f1_results  # Return f1_results to be used outside the function
+
+
+def write_f1_scores_to_html(f1_results, output_folder):
+    """
+    Write F1 scores to an HTML file
+    """
+    with open(os.path.join(output_folder, 'f1_scores.html'), 'w', encoding='utf-8') as f:
+        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        f.write(
+            "<html><body><h1>"
+            "F1 Score Results</h1><table border='1'><tr><th>File</th><th>F1-score</th><th>Precision</th><th>Recall</th><th>BLEU Score</th></tr>"
+            f"<h3>F1-score (generated on {now})</h3>\n"
+            "")
+        for file_name, metrics in f1_results.items():
+            f.write(
+                f"<tr><td>{file_name}</td><td>{metrics['f1_score']}</td><td>{metrics['precision']}</td><td>{metrics['recall']}</td><td>{metrics['bleu_score']}</td></tr>")
+        f.write("</table></body></html>")
+
+
 # 4. Hàm chính
 def main(input_file, output_file, ratio=0.2):
     text = read_and_process_html(input_file)
     sentences = split_sentences(text)
     preprocessed_sentences = [preprocess_text(sentence) for sentence in sentences]
-
+    # print(f"Tiền xử lý{text}")
     # Tạo vector TF-IDF
     vectors, all_words = create_tfidf_vectors(preprocessed_sentences)
     tfidf_docs = calculate_tfidf(preprocessed_sentences)
 
     summary, scores, similarity_matrix, graph = summarize_text_textrank_auto(text, ratio=ratio)
-
+    # print(f"Tiền xử lý{scores}")
     draw_and_show_graph(graph)
-
+    # tính diểm pagerank , gọi hàm
+    # pagerank_values = pagerank(similarity_matrix)
     # Truyền thêm tham số TF-IDF
     write_summary_with_matrix(output_file, summary, len(summary), similarity_matrix, sentences, scores, tfidf_docs,
                               all_words)
@@ -367,4 +481,20 @@ def process_all_files(input_folder, output_folder, ratio=0.2):
 if __name__ == "__main__":
     input_folder = "C:/Users/PC/PycharmProjects/bot2vec/NLP_2/input"
     output_folder = "C:/Users/PC/PycharmProjects/bot2vec/NLP_2/output"
+    ground_truth_folder = "C:/Users/PC/PycharmProjects/bot2vec/NLP_2/sum_exam"
+    if os.path.exists(ground_truth_folder):
+        print("Ground truth file exists:", ground_truth_folder)
+    else:
+        print("Ground truth file not found:", ground_truth_folder)
     process_all_files(input_folder, output_folder)
+
+    f1_results = process_all_files_with_f1_score(input_folder, output_folder, ground_truth_folder)
+
+    # Write F1-score results to HTML file
+    # f1_results = process_all_files_with_f1_score(input_folder, output_folder, ground_truth_folder)
+
+    # Write F1-score results to HTML file
+    write_f1_scores_to_html(f1_results, output_folder)
+    print("F1 Scores have been written to f1_scores.html")
+
+    print("F1 Scores have been written to f1_scores.html")
