@@ -16,11 +16,14 @@ from sklearn.metrics import f1_score, precision_score, recall_score
 from spacy.lang.am.examples import sentences
 from statsmodels.graphics.tukeyplot import results
 
+
+
 # Tải danh sách stop words tiếng Anh
 stop_words = set(stopwords.words('english'))
 
+# Hàm tách câu từ văn bản
+nlp = spacy.load("en_core_web_sm")  # Tải mô hình spaCy
 
-# Existing preprocessing function
 def preprocess_text(text):
     """
     Tiền xử lý văn bản:
@@ -34,6 +37,18 @@ def preprocess_text(text):
     words = [word for word in words if word not in stop_words]  # Loại bỏ stop words
     return words  # Trả về danh sách từ thay vì chuỗi
 
+
+
+def split_sentences(text):
+    """
+    Hàm tách câu sử dụng spaCy
+    """
+    doc = nlp(text)  # Phân tích văn bản # Tách câu theo dấu câu - Thư viện Spacy
+    # sentences = re.split(r'(?<=[.!?]) +', text) #tách câu theo cơ bản
+
+    sentences = [sent.text for sent in doc.sents]  # Lấy câu từ đối tượng doc
+
+    return sentences
 
 # Custom TF-IDF calculation functions
 def calculate_term_frequency(document):
@@ -123,23 +138,21 @@ def cosine_similarity_custom(v1, v2):
     return dot_product / (norm_v1 * norm_v2)
 
 
-# Hàm tách câu từ văn bản
-nlp = spacy.load("en_core_web_sm")  # Tải mô hình spaCy
-
-
-def split_sentences(text):
-    """
-    Hàm tách câu sử dụng spaCy
-    """
-    doc = nlp(text)  # Phân tích văn bản # Tách câu theo dấu câu - Thư viện Spacy
-    # sentences = re.split(r'(?<=[.!?]) +', text)
-
-    sentences = [sent.text for sent in doc.sents]  # Lấy câu từ đối tượng doc
-
-    return sentences
 
 
 # 2. Các hàm tính toán và phân tích
+"""
+Dưới đây là tóm tắt các thông số của hàm `pagerank`:
+
+1. **graph**: Đồ thị đầu vào (có thể là ma trận kề hoặc cấu trúc liên kết giữa các nút trong đồ thị).
+2. **max_iter=100**: Số lần lặp tối đa (mặc định là 100 vòng lặp) để thuật toán thực hiện tính toán PageRank.
+3. **d=0.85**: Hệ số giảm dần (damping factor) trong phạm vi [0, 1], mặc định là 0.85, kiểm soát mức độ ảnh hưởng của các liên kết.
+4. **tol=1e-6**: Ngưỡng sai số, khi sự thay đổi giữa các vòng lặp nhỏ hơn giá trị này, thuật toán sẽ dừng lại (mặc định là \(1 \times 10^{-6}\)).
+
+Các tham số này giúp điều chỉnh cách thức thuật toán PageRank tính toán và dừng khi đạt độ chính xác cần thiết.
+
+"""
+
 
 def pagerank(graph, max_iter=100, d=0.85, tol=1e-6):
     """
@@ -301,7 +314,7 @@ def write_summary_with_matrix(output_path, summary, num_sentences, similarity_ma
                 file.write(f"<tr><td>Sentence {i + 1}</td><td>{score:.4f}</td></tr>\n")
             file.write("</table>\n")
 
-        file.write("</body>\n</html>")  # Đảm bảo kết thúc file HTML đúng cách
+        file.write("</body>\n</html>")
 
 
 def draw_and_show_graph(graph):
@@ -434,7 +447,7 @@ def write_f1_scores_to_html(f1_results, output_folder):
     """
     Write F1 scores to an HTML file
     """
-    with open(os.path.join(output_folder, 'f1_scores.html'), 'w', encoding='utf-8') as f:
+    with open(os.path.join(output_folder, 'f1_scores.md.html'), 'w', encoding='utf-8') as f:
         now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         f.write(
             "<html><body><h1>"
@@ -482,6 +495,10 @@ if __name__ == "__main__":
     input_folder = "C:/Users/PC/PycharmProjects/bot2vec/NLP_2/input"
     output_folder = "C:/Users/PC/PycharmProjects/bot2vec/NLP_2/output"
     ground_truth_folder = "C:/Users/PC/PycharmProjects/bot2vec/NLP_2/sum_exam"
+
+    # input_folder = os.path.join(os.path.dirname(_file_), 'input')
+    # output_folder = os.path.join(os.path.dirname(_file_), 'output')
+    # ground_truth_folder = os.path.join(os.path.dirname(_file_), 'sum_exam')
     if os.path.exists(ground_truth_folder):
         print("Ground truth file exists:", ground_truth_folder)
     else:
@@ -490,12 +507,11 @@ if __name__ == "__main__":
 
     f1_results = process_all_files_with_f1_score(input_folder, output_folder, ground_truth_folder)
 
-    # Write F1-score results to HTML file
     # f1_results = process_all_files_with_f1_score(input_folder, output_folder, ground_truth_folder)
 
     # Write F1-score results to HTML file
     write_f1_scores_to_html(f1_results, output_folder)
 
-    print("F1 Scores have been written to f1_scores.html")
+    print("F1 Scores have been written to f1_scores.md.html")
 
-    print("F1 Scores have been written to f1_scores.html")
+    print("F1 Scores have been written to f1_scores.md.html")
